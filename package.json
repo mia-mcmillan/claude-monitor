@@ -1,0 +1,125 @@
+{
+  "name": "claude-monitor",
+  "displayName": "Claude Monitor",
+  "description": "Real-time Claude Code session monitoring in VS Code",
+  "version": "0.1.0",
+  "publisher": "anthropic",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anthropics/claude-monitor"
+  },
+  "author": "Anthropic",
+  "license": "MIT",
+  "keywords": [
+    "claude",
+    "ai",
+    "monitor",
+    "session",
+    "context",
+    "tokens"
+  ],
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "activationEvents": [
+    "onView:claudeMonitor.sidebar"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "claude-monitor.toggleSidebar",
+        "title": "Toggle Claude Monitor Sidebar"
+      },
+      {
+        "command": "claude-monitor.refreshSidebar",
+        "title": "Refresh Claude Monitor"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "claudeMonitor-container",
+          "title": "Claude Monitor",
+          "icon": "$(symbol-namespace)"
+        }
+      ]
+    },
+    "views": {
+      "claudeMonitor-container": [
+        {
+          "type": "webview",
+          "id": "claudeMonitor.sidebar",
+          "name": "Session Monitor"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Claude Monitor",
+      "properties": {
+        "claude-monitor.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Claude Monitor monitoring"
+        },
+        "claude-monitor.statusBarLines": {
+          "type": "integer",
+          "default": 1,
+          "minimum": 1,
+          "maximum": 5,
+          "description": "Number of lines to display in status bar"
+        },
+        "claude-monitor.statusBarPosition": {
+          "type": "string",
+          "enum": [
+            "left",
+            "right"
+          ],
+          "default": "right",
+          "description": "Position of status bar item"
+        },
+        "claude-monitor.refreshInterval": {
+          "type": "integer",
+          "default": 5000,
+          "minimum": 1000,
+          "description": "Refresh interval in milliseconds"
+        },
+        "claude-monitor.sidebarRefreshMode": {
+          "type": "string",
+          "enum": [
+            "automatic",
+            "manual"
+          ],
+          "default": "automatic",
+          "description": "Sidebar refresh mode"
+        },
+        "claude-monitor.preset": {
+          "type": "string",
+          "enum": [
+            "minimal",
+            "standard",
+            "detailed"
+          ],
+          "default": "standard",
+          "description": "Display preset"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc",
+    "watch": "tsc -w",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "deploy": "tsc && cp -r out/* ~/.vscode/extensions/anthropic.claude-monitor-0.1.0/out/ && cp package.json ~/.vscode/extensions/anthropic.claude-monitor-0.1.0/package.json && echo 'Deployed. Reload VS Code window to apply changes.'"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "typescript": "^5.0.0",
+    "vitest": "^0.34.0"
+  },
+  "dependencies": {}
+}
