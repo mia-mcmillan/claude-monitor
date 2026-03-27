@@ -77,6 +77,12 @@ export function findAllProjectSessions(): any[] {
     const cutoff = Date.now() - STALE_HOURS * 3600 * 1000;
     const results: any[] = [];
 
+    // Determine the current workspace's Claude project name
+    const workspacePath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const currentProjectName = workspacePath
+        ? workspacePath.replace(/\//g, '-').replace(/^-/, '-')
+        : null;
+
     for (const projectName of fs.readdirSync(projectsDir)) {
         const projectPath = path.join(projectsDir, projectName);
         try { if (!fs.statSync(projectPath).isDirectory()) continue; } catch { continue; }
@@ -92,7 +98,14 @@ export function findAllProjectSessions(): any[] {
             } catch { continue; }
         }
     }
-    return results.sort((a, b) => b.mtime - a.mtime);
+
+    // Sort: current workspace sessions first (by mtime desc), then others (by mtime desc)
+    return results.sort((a, b) => {
+        const aIsCurrent = a.projectName === currentProjectName ? 1 : 0;
+        const bIsCurrent = b.projectName === currentProjectName ? 1 : 0;
+        if (aIsCurrent !== bIsCurrent) return bIsCurrent - aIsCurrent;
+        return b.mtime - a.mtime;
+    });
 }
 
 export class StatusBar {

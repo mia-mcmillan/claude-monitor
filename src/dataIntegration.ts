@@ -9,6 +9,14 @@ export class DataIntegration {
     private lastFetchTime = 0;
     private readonly cacheDuration = 2000;
     private readonly claudeDir = path.join(os.homedir(), '.claude');
+    private pinnedSessionId: string | null = null;
+
+    pinSession(sessionId: string) {
+        this.pinnedSessionId = sessionId;
+        this.clearCache();
+    }
+
+    getPinnedSessionId() { return this.pinnedSessionId; }
 
     async getSessionData(): Promise<SessionData> {
         const now = Date.now();
@@ -34,8 +42,43 @@ export class DataIntegration {
     private findMostRecentSessionFile(): string | null {
         const projectsDir = path.join(this.claudeDir, 'projects');
         if (!fs.existsSync(projectsDir)) return null;
+
+        // If a session is pinned (user clicked a card), find that specific file
+        if (this.pinnedSessionId) {
+            for (const projectName of fs.readdirSync(projectsDir)) {
+                const candidate = path.join(projectsDir, projectName, `${this.pinnedSessionId}.jsonl`);
+                if (fs.existsSync(candidate)) return candidate;
+            }
+            // Pinned session not found — fall through to default behaviour
+            this.pinnedSessionId = null;
+        }
+
+        // Try to match the current workspace first
+        const workspacePath = require('vscode').workspace.workspaceFolders?.[0]?.uri.fsPath;
+        const workspaceProjectName = workspacePath
+            ? workspacePath.replace(/\//g, '-').replace(/^-/, '-')
+            : null;
+
         let newest: string | null = null;
         let newestMtime = 0;
+
+        // If we have a workspace, look there first
+        if (workspaceProjectName) {
+            const projectPath = path.join(projectsDir, workspaceProjectName);
+            if (fs.existsSync(projectPath) && fs.statSync(projectPath).isDirectory()) {
+                for (const file of fs.readdirSync(projectPath)) {
+                    if (!file.endsWith('.jsonl')) continue;
+                    const filePath = path.join(projectPath, file);
+                    try {
+                        const mtime = fs.statSync(filePath).mtimeMs;
+                        if (mtime > newestMtime) { newestMtime = mtime; newest = filePath; }
+                    } catch { continue; }
+                }
+                if (newest) return newest;
+            }
+        }
+
+        // Fallback: scan all projects
         for (const projectName of fs.readdirSync(projectsDir)) {
             const projectPath = path.join(projectsDir, projectName);
             try { if (!fs.statSync(projectPath).isDirectory()) continue; } catch { continue; }
