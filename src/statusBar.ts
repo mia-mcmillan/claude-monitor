@@ -7,7 +7,7 @@ import { msToTime } from './utils';
 
 
 const CLAUDE_DIR = path.join(os.homedir(), '.claude');
-const STALE_HOURS = 8;
+const STALE_HOURS = 24;
 
 
 const CONTEXT_WINDOWS: Record<string, string> = {
@@ -43,7 +43,7 @@ function readSessionFromFile(filePath: string): any | null {
     try {
         const lines = fs.readFileSync(filePath, 'utf8').trim().split('\n').filter(l => l.trim());
         let latestInputTokens = 0, latestOutputTokens = 0;
-        let model = 'Unknown', sessionStartTime: number | null = null, aiTitle: string | null = null;
+        let model = 'Unknown', sessionStartTime: number | null = null, aiTitle: string | null = null, entrypoint: string | null = null;
         for (const line of lines) {
             let entry: any;
             try { entry = JSON.parse(line); } catch { continue; }
@@ -51,6 +51,8 @@ function readSessionFromFile(filePath: string): any | null {
                 sessionStartTime = new Date(entry.timestamp).getTime();
             if (entry.type === 'ai-title' && entry.aiTitle)
                 aiTitle = entry.aiTitle;
+            if (!entrypoint && entry.entrypoint)
+                entrypoint = entry.entrypoint;
             if (entry.type === 'assistant' && entry.message) {
                 const msg = entry.message;
                 if (msg.model && msg.model !== '<synthetic>') model = msg.model;
@@ -65,7 +67,7 @@ function readSessionFromFile(filePath: string): any | null {
         }
         const totalTokens = latestInputTokens + latestOutputTokens;
         const contextLimit = getContextLimit(model);
-        return { model, totalTokens, contextPct: Math.round((totalTokens / contextLimit) * 100), sessionStartTime, aiTitle };
+        return { model, totalTokens, contextPct: Math.round((totalTokens / contextLimit) * 100), sessionStartTime, aiTitle, entrypoint };
     } catch { return null; }
 }
 
@@ -78,18 +80,16 @@ export function findAllProjectSessions(): any[] {
     for (const projectName of fs.readdirSync(projectsDir)) {
         const projectPath = path.join(projectsDir, projectName);
         try { if (!fs.statSync(projectPath).isDirectory()) continue; } catch { continue; }
-        let newest: string | null = null, newestMtime = 0;
         for (const file of fs.readdirSync(projectPath)) {
             if (!file.endsWith('.jsonl')) continue;
             const filePath = path.join(projectPath, file);
             try {
                 const mtime = fs.statSync(filePath).mtimeMs;
-                if (mtime > newestMtime) { newestMtime = mtime; newest = filePath; }
+                if (mtime < cutoff) continue;
+                const data = readSessionFromFile(filePath);
+                const sessionId = path.basename(filePath, '.jsonl');
+                if (data) results.push({ ...data, projectName, mtime, sessionId });
             } catch { continue; }
-        }
-        if (newest && newestMtime > cutoff) {
-            const data = readSessionFromFile(newest);
-            if (data) results.push({ ...data, projectName, mtime: newestMtime });
         }
     }
     return results.sort((a, b) => b.mtime - a.mtime);

@@ -17,8 +17,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             localResourceRoots: [this.context.extensionUri],
         };
         webviewView.webview.html = this.getHtmlContent();
+        webviewView.onDidChangeVisibility(() => { if (webviewView.visible) this.updateView(); });
         webviewView.webview.onDidReceiveMessage((message) => {
             if (message.command === 'getSidebarData') this.updateView();
+            if (message.command === 'resumeSession') {
+                vscode.commands.executeCommand('claude-vscode.editor.open', message.sessionId, undefined, vscode.ViewColumn.Active);
+            }
         });
     }
 
@@ -37,6 +41,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             project: sess.projectName.replace(/^-Users-[^-]+-Projects-/, 'Projects/').replace(/^-Users-[^-]+-/, '~/').replace(/-/g, '/'),
             pct: sess.contextPct,
             tokens: (sess.totalTokens || 0).toLocaleString(),
+            entrypoint: sess.entrypoint || 'claude-vscode',
+            sessionId: sess.sessionId,
+            projectName: sess.projectName,
             age: (() => {
                 const sec = Math.floor((Date.now() - sess.mtime) / 1000);
                 if (sec < 60) return 'just now';
@@ -125,6 +132,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   .session-tokens{font-size:10px;color:var(--vscode-descriptionForeground)}
   .session-bar-track{height:2px;background:var(--vscode-progressBar-background,#444);border-radius:1px;margin:4px 0}
   .session-bar-fill{height:100%;border-radius:1px}
+  .ep-badge{font-size:9px;padding:1px 5px;border-radius:3px;margin-left:6px;font-weight:500}
+  .ep-vscode{color:#7c9ef8;background:rgba(124,158,248,.15)}
+  .ep-cli{color:#EBDC82;background:rgba(235,220,130,.15)}
+  .project-group{margin-bottom:8px}
+  .project-group-label{font-size:10px;color:#EBDC82;font-weight:600;padding:6px 0 4px;border-bottom:1px solid var(--vscode-widget-border,#333);margin-bottom:6px}
+  .session-card{border:1px solid var(--vscode-widget-border,#333);border-radius:4px;margin-bottom:6px;padding:7px 10px;cursor:pointer;transition:border-color .15s}
+  .session-card:hover{border-color:var(--vscode-focusBorder,#007acc)}
   .agent-card{border:1px solid var(--vscode-widget-border,#333);border-radius:4px;margin-bottom:5px;padding:7px 10px}
   .agent-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
   .agent-name{font-size:11px;font-weight:500;color:#a78bfa}
@@ -151,7 +165,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       <div class="stat"><div class="stat-label">active agents</div><div class="stat-val" id="s-agents">0</div></div>
     </div>
     <div class="stat-row">
-      <div class="stat" style="flex:1"><div class="stat-label">total tokens · last 8h</div><div class="stat-val" id="s-total-tokens">—</div></div>
+      <div class="stat" style="flex:1"><div class="stat-label">total tokens · last 24h</div><div class="stat-val" id="s-total-tokens">—</div></div>
     </div>
   </div>
 </div>
@@ -189,8 +203,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   <span id="status-text">waiting for session…</span>
 </div>
 <script>
+  const _vsc = acquireVsCodeApi();
+  document.addEventListener('click', e => {
+    const card = e.target.closest('[data-session-id]');
+    if (card) _vsc.postMessage({ command: 'resumeSession', sessionId: card.dataset.sessionId });
+  });
   window.addEventListener('message', e => {
     const msg = e.data;
+    window.__lastData = msg;
     if (msg.type !== 'updateSidebar') return;
     const d = msg.data;
     document.getElementById('model').textContent = d.model || '—';
@@ -247,14 +267,26 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const sessEl = document.getElementById('sessions-list');
     if (!sessions.length) { sessEl.innerHTML = '<div class="empty">No sessions found</div>'; }
     else {
-      sessEl.innerHTML = sessions.map(s => {
-        const barColor = s.pct >= 80 ? '#f87171' : s.pct >= 50 ? '#fbbf24' : '#82D796';
-        return '<div class="session-card">'
-          + '<div class="session-top"><span class="session-project">'+esc(s.project)+'</span><span class="session-age">'+esc(s.age)+'</span></div>'
-          + '<div class="session-title" title="'+esc(s.title)+'">'+esc(s.title)+'</div>'
-          + '<div class="session-bar-track"><div class="session-bar-fill" style="width:'+Math.min(100,s.pct)+'%;background:'+barColor+'"></div></div>'
-          + '<div class="session-bottom"><span class="session-model">'+esc(s.model)+'</span><span class="session-tokens"><span style="color:'+barColor+'">'+esc(s.pct)+'%</span> · '+esc(s.tokens)+'</span></div>'
-          + '</div>';
+      // Group by projectName
+      const groups = {};
+      sessions.forEach(s => {
+        if (!groups[s.projectName]) groups[s.projectName] = [];
+        groups[s.projectName].push(s);
+      });
+      sessEl.innerHTML = Object.entries(groups).map(([projName, projSessions]) => {
+        const label = projName.replace(/^-Users-[^-]+-Projects-/, 'Projects/').replace(/^-Users-[^-]+-/, '~/').replace(/-/g, '/');
+        const cards = projSessions.map(s => {
+          const barColor = s.pct >= 80 ? '#f87171' : s.pct >= 50 ? '#fbbf24' : '#82D796';
+          const epLabel = s.entrypoint === 'cli' ? 'cli' : s.entrypoint === 'claude-vscode' ? 'vscode' : (s.entrypoint || 'vscode').replace('claude-', '');
+          const epClass = s.entrypoint === 'cli' ? 'ep-cli' : 'ep-vscode';
+          return '<div class="session-card" data-session-id="'+esc(s.sessionId)+'" title="Click to resume this session">'
+            + '<div class="session-top"><span class="session-age">'+esc(s.age)+'</span></div>'
+            + '<div class="session-title" title="'+esc(s.title)+'">'+esc(s.title)+'</div>'
+            + '<div class="session-bar-track"><div class="session-bar-fill" style="width:'+Math.min(100,s.pct)+'%;background:'+barColor+'"></div></div>'
+            + '<div class="session-bottom"><span class="session-model">'+esc(s.model)+'<span class="ep-badge '+epClass+'">'+epLabel+'</span></span><span class="session-tokens"><span style="color:'+barColor+'">'+esc(s.pct)+'%</span> · '+esc(s.tokens)+'</span></div>'
+            + '</div>';
+        }).join('');
+        return '<div class="project-group"><div class="project-group-label">'+esc(label)+'</div>'+cards+'</div>';
       }).join('');
     }
   });
