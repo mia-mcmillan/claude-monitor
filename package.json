@@ -2,7 +2,7 @@
   "name": "claude-monitor",
   "displayName": "Claude Monitor",
   "description": "Real-time Claude Code session monitoring in VS Code",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "miamcmillan",
   "repository": {
     "type": "git",
@@ -113,7 +113,7 @@
   },
   "scripts": {
     "compile": "tsc",
-    "package": "npm run compile && vsce package",
+    "package": "npm version patch --no-git-tag-version && npm run compile && vsce package",
     "watch": "tsc -w",
     "test": "vitest",
     "test:watch": "vitest --watch",
