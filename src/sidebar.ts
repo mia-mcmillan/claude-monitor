@@ -7,8 +7,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     static readonly viewType = 'claudeMonitor.sidebar';
     private view?: vscode.WebviewView;
     private sessionData?: SessionData;
+    private onSessionPinned?: (sessionId: string) => void;
+    private pinnedSessionId?: string;
 
     constructor(private readonly context: vscode.ExtensionContext) {}
+
+    setOnSessionPinned(callback: (sessionId: string) => void) {
+        this.onSessionPinned = callback;
+    }
+
+    setPinnedSessionId(sessionId: string) {
+        this.pinnedSessionId = sessionId;
+    }
 
     async resolveWebviewView(webviewView: vscode.WebviewView) {
         this.view = webviewView;
@@ -22,9 +32,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             if (message.command === 'getSidebarData') this.updateView();
             if (message.command === 'resumeSession') {
                 const sessionId = message.sessionId;
-                // Just call editor.open with the sessionId.
-                // If Claude Code's sessionPanels has it registered, it reveals.
-                // If not (post-reload), it creates a new tab — acceptable.
+                this.pinnedSessionId = sessionId;
+                if (this.onSessionPinned) this.onSessionPinned(sessionId);
+                this.updateView();
                 await vscode.commands.executeCommand('claude-vscode.editor.open', sessionId);
             }
         });
@@ -37,7 +47,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         const contextLimit = s?.contextLimit || 200000;
         const pct = Math.round((contextUsed / contextLimit) * 100);
         const rawSessions = findAllProjectSessions();
-        const currentSession = rawSessions[0];
+        // Use the pinned session if set, otherwise fall back to most recent
+        const pinnedId = this.pinnedSessionId;
+        const currentSession = (pinnedId
+            ? rawSessions.find((sess: any) => sess.sessionId === pinnedId)
+            : null) || rawSessions[0];
         const totalTokensAll = rawSessions.reduce((sum: number, sess: any) => sum + (sess.totalTokens || 0), 0);
         const allSessions = rawSessions.map((sess: any) => ({
             model: formatModelId(sess.model),
@@ -141,8 +155,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   .ep-cli{color:#EBDC82;background:rgba(235,220,130,.15)}
   .project-group{margin-bottom:8px}
   .project-group-label{font-size:10px;color:#EBDC82;font-weight:600;padding:6px 0 4px;border-bottom:1px solid var(--vscode-widget-border,#333);margin-bottom:6px}
-  .session-card{border:1px solid var(--vscode-widget-border,#333);border-radius:4px;margin-bottom:6px;padding:7px 10px;cursor:pointer;transition:border-color .15s}
-  .session-card:hover{border-color:var(--vscode-focusBorder,#007acc);transition:none}
+  .session-card{border:1px solid var(--vscode-widget-border,#333);border-radius:4px;margin-bottom:6px;padding:7px 10px;cursor:pointer}
+  .session-card:hover,.session-card.hovered{border-color:var(--vscode-focusBorder,#007acc)}
   .agent-card{border:1px solid var(--vscode-widget-border,#333);border-radius:4px;margin-bottom:5px;padding:7px 10px}
   .agent-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
   .agent-name{font-size:11px;font-weight:500;color:#a78bfa}
@@ -208,6 +222,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 </div>
 <script>
   const _vsc = acquireVsCodeApi();
+  let _hoveredSessionId = null;
+  document.addEventListener('mouseover', e => {
+    const card = e.target.closest('[data-session-id]');
+    _hoveredSessionId = card ? card.dataset.sessionId : null;
+  });
+  document.addEventListener('mouseleave', () => { _hoveredSessionId = null; }, true);
   document.addEventListener('mousedown', e => {
     const card = e.target.closest('[data-session-id]');
     if (card) {
@@ -295,6 +315,10 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         }).join('');
         return '<div class="project-group"><div class="project-group-label">'+esc(label)+'</div>'+cards+'</div>';
       }).join('');
+      if (_hoveredSessionId) {
+        const el = sessEl.querySelector('[data-session-id="'+_hoveredSessionId+'"]');
+        if (el) el.classList.add('hovered');
+      }
     }
   });
   function toggleSessions() {

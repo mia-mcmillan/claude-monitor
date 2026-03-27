@@ -33,6 +33,13 @@ export async function activate(context: vscode.ExtensionContext) {
       )
     );
 
+    // Wire up session pinning: when user clicks a session card, pin it
+    sidebarProvider.setOnSessionPinned((sessionId) => {
+        sidebarProvider.setPinnedSessionId(sessionId);
+        dataIntegration.pinSession(sessionId);
+        updateStatus();
+    });
+
     // Show status bar
     statusBar.show();
 
@@ -106,6 +113,20 @@ export async function activate(context: vscode.ExtensionContext) {
       })
     );
 
+    // Listen for tab changes — if user switches to a different Claude Code tab,
+    // try to detect which session it is and update the current session display
+    context.subscriptions.push(
+      vscode.window.tabGroups.onDidChangeTabs(() => {
+        const sessionId = resolveActiveTabSession();
+        if (sessionId) {
+          sidebarProvider.setPinnedSessionId(sessionId);
+          dataIntegration.pinSession(sessionId);
+        }
+        dataIntegration.clearCache();
+        updateStatus();
+      })
+    );
+
     vscode.window.showInformationMessage('Claude Monitor activated');
   } catch (error) {
     console.error('Failed to activate Claude Monitor:', error);
@@ -158,4 +179,24 @@ async function updateSidebarData() {
   } catch (error) {
     console.error('Failed to update sidebar:', error);
   }
+}
+
+function resolveActiveTabSession(): string | null {
+  const activeTab = vscode.window.tabGroups.activeTabGroup.activeTab;
+  if (!activeTab) return null;
+  if (!(activeTab.input instanceof vscode.TabInputWebview)) return null;
+  if (activeTab.input.viewType !== 'claudeVSCodePanel') return null;
+
+  const label = activeTab.label?.toLowerCase();
+  if (!label) return null;
+
+  const sessions = findAllProjectSessions();
+  for (const sess of sessions) {
+    const title = sess.aiTitle?.toLowerCase();
+    if (!title || title === 'untitled session') continue;
+    if (title.includes(label) || label.includes(title)) {
+      return sess.sessionId;
+    }
+  }
+  return null;
 }

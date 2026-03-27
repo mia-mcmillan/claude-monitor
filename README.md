@@ -46,7 +46,7 @@ Context emoji: 🟢 below 50%, 🟡 50–80%, 🔴 above 80%.
 - Stat cards: duration, tools used, active agents
 - Total tokens across all sessions in the last 24h
 
-**All sessions** — grouped by project, cards for every session active in the last 24h. Click any card to open it in a Claude Code editor tab.
+**All sessions** — grouped by project, cards for every session active in the last 24h. Click any card to open it in a Claude Code editor tab. The current session card automatically updates when you switch between Claude Code editor tabs.
 
 **Active agents** — sub-agents detected in the current session, with start time and ID
 
