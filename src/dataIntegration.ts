@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import { SessionData } from './types';
+import { getContextLimit } from './statusBar';
 
 export class DataIntegration {
     private cachedData: SessionData | null = null;
@@ -65,6 +66,8 @@ export class DataIntegration {
         let sessionStartTime: number | null = null;
         const tools: any[] = [];
         const toolIds = new Set<string>();
+        const agentIds = new Set<string>();
+        const agents: any[] = [];
 
         for (const line of lines) {
             let entry: any;
@@ -106,17 +109,29 @@ export class DataIntegration {
                     }
                 }
             }
+
+            // Track sub-agents via isSidechain + agentId
+            if (entry.isSidechain && entry.agentId && !agentIds.has(entry.agentId)) {
+                agentIds.add(entry.agentId);
+                agents.push({
+                    id: entry.agentId,
+                    name: `Agent ${agents.length + 1}`,
+                    type: 'sub-agent',
+                    status: 'running',
+                    startTime: entry.timestamp ? new Date(entry.timestamp).getTime() : Date.now(),
+                });
+            }
         }
 
         return {
             contextUsed: latestInputTokens + latestOutputTokens,
-            contextLimit: 200000,
+            contextLimit: getContextLimit(model),
             model,
             authProvider: 'Anthropic',
             sessionStartTime: sessionStartTime || Date.now(),
             isActive: true,
             tools: tools.slice(-20),
-            agents: [],
+            agents,
         };
     }
 

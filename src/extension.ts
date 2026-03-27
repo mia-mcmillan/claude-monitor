@@ -4,6 +4,7 @@ import { StatusBar } from './statusBar';
 import { SidebarProvider } from './sidebar';
 import { DataIntegration } from './dataIntegration';
 import { GitHelper } from './gitHelper';
+import { findAllProjectSessions, formatModelId } from './statusBar';
 
 let statusBar: StatusBar;
 let sidebarProvider: SidebarProvider;
@@ -32,9 +33,7 @@ export async function activate(context: vscode.ExtensionContext) {
       )
     );
 
-    // Create status bar
-    const config = configManager.getConfig();
-    statusBar.create(config.statusBarPosition || 'right', 100);
+    // Show status bar
     statusBar.show();
 
     // Register commands
@@ -49,6 +48,42 @@ export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
       vscode.commands.registerCommand('claude-monitor.refreshSidebar', () => {
         updateSidebarData();
+      })
+    );
+
+    context.subscriptions.push(
+      vscode.commands.registerCommand('claude-monitor.showSessionBreakdown', async () => {
+        const sessions = findAllProjectSessions();
+        if (sessions.length === 0) {
+          vscode.window.showInformationMessage('No active sessions found (sessions older than 8h are hidden).');
+          return;
+        }
+        const items = sessions.map((s: any) => {
+          const pct = s.contextPct;
+          const filled = Math.round(pct / 10);
+          const bar = '█'.repeat(filled) + '░'.repeat(10 - filled);
+          const ctxEmoji = pct >= 80 ? '🔴' : pct >= 50 ? '🟡' : '🟢';
+          const project = s.projectName.replace(/^-Users-[^-]+-/, '').replace(/-/g, '/');
+          const age = (() => {
+            const sec = Math.floor((Date.now() - s.mtime) / 1000);
+            if (sec < 60) return 'just now';
+            if (sec < 3600) return `${Math.floor(sec / 60)}m ago`;
+            if (sec < 86400) return `${Math.floor(sec / 3600)}h ago`;
+            return `${Math.floor(sec / 86400)}d ago`;
+          })();
+          const tokens = s.totalTokens ? s.totalTokens.toLocaleString() + ' tokens' : '';
+          const title = s.aiTitle || 'Untitled session';
+          return {
+            label: `$(folder) ${project}   ${title}`,
+            description: `$(history) ${age}`,
+            detail: `${ctxEmoji} ${bar} ${pct}%   $(rocket) ${formatModelId(s.model)}   $(circuit-board) ${tokens}`,
+          };
+        });
+        await vscode.window.showQuickPick(items, {
+          title: `Claude Sessions (${sessions.length} active)`,
+          placeHolder: 'Most recently active first',
+          matchOnDescription: true,
+        });
       })
     );
 
@@ -104,15 +139,13 @@ async function updateStatus() {
   try {
     const sessionData = await dataIntegration.getSessionData();
     const gitStatus = await gitHelper.getGitStatus();
-    const config = configManager.getConfig();
     const colors = configManager.getColorConfig();
 
     // Update status bar
-    statusBar.update(config.statusBarLines, sessionData, gitStatus, colors);
+    statusBar.update(sessionData, gitStatus, colors);
 
     // Update sidebar
     sidebarProvider.setSessionData(sessionData);
-    sidebarProvider.setGitStatus(gitStatus);
     updateSidebarData();
   } catch (error) {
     console.error('Failed to update status:', error);

@@ -34,6 +34,10 @@
       {
         "command": "claude-monitor.refreshSidebar",
         "title": "Refresh Claude Monitor"
+      },
+      {
+        "command": "claude-monitor.showSessionBreakdown",
+        "title": "Claude Monitor: Show Session Breakdown"
       }
     ],
     "viewsContainers": {
@@ -50,7 +54,7 @@
         {
           "type": "webview",
           "id": "claudeMonitor.sidebar",
-          "name": "Session Monitor"
+          "name": "Claude Monitor"
         }
       ]
     },
