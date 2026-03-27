@@ -2,7 +2,7 @@
   "name": "claude-monitor",
   "displayName": "Claude Monitor",
   "description": "Real-time Claude Code session monitoring in VS Code",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "miamcmillan",
   "repository": {
     "type": "git",
@@ -116,7 +116,7 @@
     "watch": "tsc -w",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "deploy": "tsc && cp -r out/* ~/.vscode/extensions/miamcmillan.claude-monitor-0.1.0/out/ && cp package.json ~/.vscode/extensions/miamcmillan.claude-monitor-0.1.0/package.json && echo 'Deployed. Reload VS Code window to apply changes.'"
+    "deploy": "tsc && cp -r out/* ~/.vscode/extensions/miamcmillan.claude-monitor-0.2.0/out/ && cp package.json ~/.vscode/extensions/miamcmillan.claude-monitor-0.2.0/package.json && echo 'Deployed. Reload VS Code window to apply changes.'"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
