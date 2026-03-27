@@ -18,10 +18,14 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         };
         webviewView.webview.html = this.getHtmlContent();
         webviewView.onDidChangeVisibility(() => { if (webviewView.visible) this.updateView(); });
-        webviewView.webview.onDidReceiveMessage((message) => {
+        webviewView.webview.onDidReceiveMessage(async (message) => {
             if (message.command === 'getSidebarData') this.updateView();
             if (message.command === 'resumeSession') {
-                vscode.commands.executeCommand('claude-vscode.editor.open', message.sessionId, undefined, vscode.ViewColumn.Active);
+                const sessionId = message.sessionId;
+                // Just call editor.open with the sessionId.
+                // If Claude Code's sessionPanels has it registered, it reveals.
+                // If not (post-reload), it creates a new tab — acceptable.
+                await vscode.commands.executeCommand('claude-vscode.editor.open', sessionId);
             }
         });
     }
@@ -138,7 +142,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   .project-group{margin-bottom:8px}
   .project-group-label{font-size:10px;color:#EBDC82;font-weight:600;padding:6px 0 4px;border-bottom:1px solid var(--vscode-widget-border,#333);margin-bottom:6px}
   .session-card{border:1px solid var(--vscode-widget-border,#333);border-radius:4px;margin-bottom:6px;padding:7px 10px;cursor:pointer;transition:border-color .15s}
-  .session-card:hover{border-color:var(--vscode-focusBorder,#007acc)}
+  .session-card:hover{border-color:var(--vscode-focusBorder,#007acc);transition:none}
   .agent-card{border:1px solid var(--vscode-widget-border,#333);border-radius:4px;margin-bottom:5px;padding:7px 10px}
   .agent-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px}
   .agent-name{font-size:11px;font-weight:500;color:#a78bfa}
@@ -204,9 +208,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 </div>
 <script>
   const _vsc = acquireVsCodeApi();
-  document.addEventListener('click', e => {
+  document.addEventListener('mousedown', e => {
     const card = e.target.closest('[data-session-id]');
-    if (card) _vsc.postMessage({ command: 'resumeSession', sessionId: card.dataset.sessionId });
+    if (card) {
+      e.preventDefault();
+      _vsc.postMessage({ command: 'resumeSession', sessionId: card.dataset.sessionId });
+    }
   });
   window.addEventListener('message', e => {
     const msg = e.data;

@@ -82,6 +82,7 @@ Context emoji: 🟢 below 50%, 🟡 50–80%, 🔴 above 80%.
 
 **Click to switch not working**
 - Make sure Claude Code extension is installed and active
+- If it opens a duplicate tab after a VS Code reload, close the extras — Claude Code needs a moment to re-register its session panels after restart
 
 ## Development
 
@@ -89,14 +90,22 @@ Context emoji: 🟢 below 50%, 🟡 50–80%, 🔴 above 80%.
 git clone https://github.com/mia-mcmillan/claude-monitor
 cd claude-monitor
 npm install
-npm run deploy     # compile + copy to installed extension
+npm run deploy     # compile + deploy to installed extension (auto-detects version)
 ```
 
 Then `Cmd+Shift+P` → `Developer: Reload Window`.
 
 ```bash
-npm run package    # build .vsix
+npm run package    # bump patch version + compile + build .vsix
 ```
+
+### Workflow
+
+1. Make changes in `src/`
+2. `npm run deploy` — compiles and copies to the active extension directory
+3. Reload VS Code to pick up changes
+4. When ready to release: `git add -A && git commit -m "message" && git push`
+5. `npm run package` — bumps version, builds `.vsix` for distribution
 
 ## Requirements
 

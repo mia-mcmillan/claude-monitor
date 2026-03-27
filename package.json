@@ -117,7 +117,7 @@
     "watch": "tsc -w",
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "deploy": "tsc && cp -r out/* ~/.vscode/extensions/miamcmillan.claude-monitor-0.2.0/out/ && cp package.json ~/.vscode/extensions/miamcmillan.claude-monitor-0.2.0/package.json && echo 'Deployed. Reload VS Code window to apply changes.'"
+    "deploy": "tsc && VERSION=$(node -p \"require('./package.json').version\") && EXT_DIR=~/.vscode/extensions/miamcmillan.claude-monitor-$VERSION && mkdir -p $EXT_DIR/out && cp -r out/* $EXT_DIR/out/ && cp package.json $EXT_DIR/package.json && echo \"Deployed v$VERSION. Reload VS Code.\""
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
