@@ -1,75 +1,65 @@
 # Claude Monitor for VS Code
 
-Real-time Claude Code session monitoring directly in VS Code.
+Real-time Claude Code session monitoring directly in VS Code. No API key required — reads directly from Claude Code's local session files.
 
 ## Features
 
-- **Status Bar** — model name, context %, project, git branch, session duration, tool count, agent count
-- **Sidebar Panel** — fixed current session card with context bar, collapsible all sessions, active agents, and tool calls sections
-- **Session Breakdown** — click status bar to see all active sessions (last 8h) with context bars and token counts
-- **Sub-agent Tracking** — detects and displays active sub-agents from Claude Code sessions
-- **1M Context Support** — automatically uses correct context limit per model (Opus = 1M, others = 200K)
-- **Auto-refresh** — updates every 5 seconds by default, configurable
-- **Zero Config** — reads directly from `~/.claude/` session files, no API key needed
-- **Works with Claude Teams** — no separate Anthropic API billing required
+- **Status Bar** — model name, context %, session duration, tool count, agent count — colour coded
+- **Session Breakdown** — click the status bar to see all sessions from the last 24h across all projects
+- **Sidebar Panel** — fixed current session card, collapsible All Sessions (grouped by project), Active Agents, and Tool Calls sections
+- **Click to Switch** — click any session card to open it directly in a Claude Code editor tab
+- **Sub-agent Tracking** — detects and counts sub-agents spawned during Claude Code sessions
+- **Multi-model Context** — automatically uses 1M token limit for Opus models, 200K for others
+- **Zero Config** — reads from `~/.claude/projects/` session files, no API key needed
+- **Works with Claude Teams** — uses your existing Claude Code subscription
 
 ## How It Works
 
-Claude Monitor reads the JSONL session files that Claude Code writes to `~/.claude/projects/`. It picks the most recently active session and extracts token usage, model name, tool calls, sub-agents, and session titles directly from those files.
+Claude Monitor reads the JSONL session files that Claude Code writes to `~/.claude/projects/`. It scans all sessions modified within the last 24h and extracts token usage, model name, tool calls, sub-agents, and session titles directly from those files.
 
 ## Quick Start
 
 1. Install the `.vsix` from the [releases page](https://github.com/mia-mcmillan/claude-monitor/releases)
 2. Open VS Code with Claude Code active in a project
 3. The status bar appears bottom-right showing your current session
-4. Click the status bar to see a breakdown of all active sessions
-5. Open the sidebar via the activity bar icon
+4. Click the status bar to open the session breakdown quick pick
+5. Click the Claude Monitor icon in the activity bar to open the sidebar panel
 
 ## Status Bar
 
-Three colour-coded items on the right:
-
 ```
-🚀 Sonnet 4.6  🟢 6%     MiaOS  main     Session: 2h  |  Tools: 14  |  Agents: 0
+🚀 Sonnet 4.6  🟢 6%    📁 MiaOS  ⎇ main    Session: 2h  |  Tools: 14  |  Agents: 0
 ```
 
-| Colour | Content |
-|--------|---------|
-| Peach `#F5B482` | Model name + context % |
-| Yellow `#EBDC82` | Project name + git branch |
-| Green `#82D796` | Session duration, tool count, agent count |
+| Section | Colour | Meaning |
+|---------|--------|---------|
+| Model + context % | Peach | Model name and context usage |
+| Project + branch | Yellow | Current workspace and git branch |
+| Session stats | Green | Duration, tool calls, sub-agents |
 
-Context indicator changes colour automatically:
+Context emoji: 🟢 below 50%, 🟡 50–80%, 🔴 above 80%.
 
-| Indicator | Meaning |
-|-----------|---------|
-| 🟢 | Below 50% |
-| 🟡 | 50–80% |
-| 🔴 | Above 80% |
+## Sidebar Panel
 
-## Sidebar
+**Current session** (fixed at top)
+- Session card: project, title, context bar, model, token count
+- Stat cards: duration, tools used, active agents
+- Total tokens across all sessions in the last 24h
 
-The sidebar has a fixed **Current Session** section at the top showing:
-- Session title, project, age, model, context bar, context % and token count
-- Duration, tools used, active agents
-- Total tokens across all sessions in the last 8h
+**All sessions** — grouped by project, cards for every session active in the last 24h. Click any card to open it in a Claude Code editor tab.
 
-Below that, scrollable collapsible sections:
-- **All Sessions** — cards for every session active in the last 8h
-- **Active Agents** — sub-agents detected in the current session
-- **Tool Calls** — last 20 tool calls with inputs and status
+**Active agents** — sub-agents detected in the current session, with start time and ID
+
+**Tool calls** — last 20 tool calls with name, namespace, inputs, and status
 
 ## Configuration
 
-Edit VS Code `settings.json`:
-
 ```json
 {
-  "claude-monitor.refreshInterval": 5000
+  "claude-monitor.refreshInterval": 5000,
+  "claude-monitor.statusBarPosition": "right"
 }
 ```
-
-### Settings Reference
 
 | Setting | Default | Options |
 |---------|---------|---------|
@@ -80,18 +70,18 @@ Edit VS Code `settings.json`:
 ## Troubleshooting
 
 **Status bar shows no data**
-- Make sure Claude Code has been used at least once in a project — needs a session file in `~/.claude/projects/`
+- Make sure Claude Code has been used at least once — it needs a session file in `~/.claude/projects/`
 - Reload VS Code (`Cmd+Shift+P` → `Developer: Reload Window`)
 
-**Sidebar not updating**
-- Run `Cmd+Shift+P` → `Refresh Claude Monitor`
-- Check `claude-monitor.refreshInterval` isn't set too high
+**Session not showing in All Sessions**
+- Sessions older than 24h are hidden
+- Check the session has been active recently
 
-**Wrong session showing**
-- Claude Monitor always picks the most recently modified session file across all projects
+**Agents always showing 0**
+- Sub-agents are only created during multi-agent Claude Code tasks. Single-agent sessions always show 0.
 
-**Agents always shows 0**
-- Agent tracking requires Claude Code sessions that use sub-agents (multi-agent tasks). Single-agent sessions will always show 0.
+**Click to switch not working**
+- Make sure Claude Code extension is installed and active
 
 ## Development
 
@@ -102,17 +92,16 @@ npm install
 npm run deploy     # compile + copy to installed extension
 ```
 
-Then `Cmd+Shift+P` → `Developer: Reload Window` to pick up changes.
+Then `Cmd+Shift+P` → `Developer: Reload Window`.
 
-To package a new `.vsix`:
 ```bash
-npm run package
+npm run package    # build .vsix
 ```
 
 ## Requirements
 
 - VS Code 1.80 or newer
-- Claude Code extension (generates the session files this extension reads)
+- Claude Code extension
 
 ## License
 
